@@ -1,0 +1,24 @@
+# Environnement Python
+.venv/
+__pycache__/
+*.pyc
+
+# Données et logs (générés par le collecteur)
+data/
+*.log
+*.tmp
+*.duckdb
+
+# Notebooks de test
+.ipynb_checkpoints/
+scratch.ipynb
+
+# Caches des outils
+.pytest_cache/
+.ruff_cache/
+
+# Secrets (au cas où, plus tard)
+.env
+
+# Fichiers du système Mac
+.DS_Store
