@@ -80,7 +80,7 @@ def to_dataframe(rows: list[dict], currency: str, snapshot_ts: pd.Timestamp) -> 
 
 def save_snapshot(df: pd.DataFrame, currency: str, snapshot_ts: pd.Timestamp) -> Path:
         
-    folder = DATA_DIR / f"currency = {currency}" / f"date={snapshot_ts:%Y-%m-%d}"
+    folder = DATA_DIR / f"currency={currency}" / f"date={snapshot_ts:%Y-%m-%d}"
     folder.mkdir(parents=True, exist_ok=True)
     final = folder / f"snapshot_{snapshot_ts:%H%M%S}.parquet"
     tmp=final.with_suffix(".tmp")

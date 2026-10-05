@@ -17,47 +17,29 @@ def vega(F:float, k:float, T:float, sigma:float) -> float :
     d1 = (np.log(F/k) + 0.5*T*sigma**2)/(sigma*sqrt_T)
     return F * norm.pdf(d1) * sqrt_T
 
-def Newton(prix_usd:float, F:float, k:float, T:float, is_call:bool, max_it:float=50, tol:float=1e-8) -> float:
-    
-    sigma = 0.5
-    for i in range(max_it):
-        
-        ecart = bs_price(F, k, T, sigma, is_call) - prix_usd
-        if np.abs(ecart) < tol:
-            return sigma
+def newton_vec(prix_usd:float, F:float, k:float, T, is_call:bool, tol:float=1e-8, max_iter:int=50) -> float:
+    s = np.full(np.shape(prix_usd), 0.5)
+    with np.errstate(all="ignore"):
+        for _ in range(max_iter):
+            diff = bs_price(F, k, T, s, is_call) - prix_usd
+            if np.all(np.abs(diff) < tol):
+                break
+            v = vega(F, k, T, s)
+            step = np.where(v > 1e-12, diff / v, 0.0)          
+            s = np.where(np.abs(diff) < tol, s, s - step)      
+            s = np.clip(s, 1e-4, 5)                            
+        diff = bs_price(F, k, T, s, is_call) - prix_usd
+    return np.where(np.abs(diff) < tol, s, np.nan)
 
-        v = vega(F, k, T, sigma)
-        if not np.isfinite(v) or v<1e-12:
-            return np.nan
-        
-        sigma = sigma - ecart/v
-        
-        if not np.isfinite(sigma) or sigma<1e-4 or sigma>5:
-            return np.nan
-    
-    return np.nan
 
-def _brent(prix_usd: float, F:float, k:float, T:float, is_call:bool, tol:float=1e-8) -> float:
-    f= lambda s: bs_price(F,k,T,s,is_call)
-    try:
-        return brentq(f, 1e-4, 5, xtol=tol)
-    except ValueError:
-        return np.nan
+def implied_vol_vec(prix_usd:float, F:float, k:float, T:float, is_call:bool, tol:float=1e-8, max_iter:int=50):
+    prix_usd, F, k, T = np.broadcast_arrays(
+        *(np.asarray(x, dtype=float) for x in (prix_usd, F, k, T))
+    )
+    is_call = np.broadcast_to(np.asarray(is_call, dtype=bool), prix_usd.shape)
 
-def implied_vol(prix_usd:float, F:float, k:float, T:float, is_call) -> float:
+    lower = np.where(is_call, np.maximum(F - k, 0), np.maximum(k - F, 0))
+    upper = np.where(is_call, F, k)
+    valid = (T > 0) & (prix_usd > lower) & (prix_usd < upper)
 
-    if T<=0 or prix_usd<=0:
-        return np.nan
-    if is_call:
-        born_inf, born_max = max(F-k, 0), F
-    else:
-         born_inf, born_max = max(k-F, 0), k
-
-    if prix_usd<born_inf or prix_usd>born_max:
-        return np.nan
-    
-    sigma = Newton(prix_usd, F, k, T, is_call)
-    if np.isnan(sigma):
-        sigma = _brent(prix_usd, F, k, T, is_call)
-    return sigma
-
+    return np.where(valid, newton_vec(prix_usd, F, k, T, is_call, tol, max_iter), np.nan)

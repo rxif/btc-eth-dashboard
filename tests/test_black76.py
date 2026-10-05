@@ -1,5 +1,5 @@
 import numpy as np
-from pricing.black76 import bs_price, vega, implied_vol
+from pricing.black76 import bs_price, vega, implied_vol_vec
 
 
 def test_reference_price():
@@ -25,16 +25,60 @@ def test_vega_vs_numerical_derivative():
 
 
 def test_round_trip():
-    """sigma -> price -> sigma should give back sigma."""
-    for F, k, T, s in [(100, 100, 1, 0.2), (100, 130, 0.25, 0.8), (100, 70, 2, 0.5)]:
-        for is_call in (True, False):
-            price = bs_price(F, k, T, s, is_call)
-            assert abs(implied_vol(price, F, k, T, is_call) - s) < 1e-6
+    """sigma -> price -> sigma on a grid, for calls and puts."""
+    F = 100.0
+    T = np.array([1.0, 0.25, 2.0])
+    k = np.array([100.0, 130.0, 70.0])
+    s = np.array([0.2, 0.8, 0.5])
+    for is_call in (True, False):
+        price = bs_price(F, k, T, s, is_call)
+        out = implied_vol_vec(price, F, k, T, is_call)
+        assert np.nanmax(np.abs(out - s)) < 1e-6
+
+
+def test_round_trip_wide_grid():
+    """Round trip on a wide strike/vol grid, using OTM options."""
+    k = np.linspace(60, 140, 17)
+    s = np.linspace(0.2, 1.5, 17)
+    is_call = k > 100
+    price = bs_price(100.0, k, 0.5, s, is_call)
+    out = implied_vol_vec(price, 100.0, k, 0.5, is_call)
+    assert np.nanmax(np.abs(out - s)) < 1e-6
 
 
 def test_impossible_cases_return_nan():
     """No valid vol exists: the solver must return nan, not crash."""
-    assert np.isnan(implied_vol(-1, 100, 100, 1, True))    # negative price
-    assert np.isnan(implied_vol(5, 100, 90, 1, True))      # below intrinsic value (10)
-    assert np.isnan(implied_vol(100, 100, 90, 1, True))    # at the upper bound (F)
-    assert np.isnan(implied_vol(5, 100, 100, 0, True))     # T = 0
+    price = np.array([-1.0, 5.0, 100.0, 5.0])
+    k = np.array([100.0, 90.0, 90.0, 100.0])
+    T = np.array([1.0, 1.0, 1.0, 0.0])
+    out = implied_vol_vec(price, 100.0, k, T, True)
+    assert np.isnan(out).all()   # negative, below intrinsic, at upper bound, T = 0
+
+
+def test_scalar_inputs():
+    """Scalar inputs must work and give back sigma."""
+    price = bs_price(100.0, 100.0, 1.0, 0.2, True)
+    out = implied_vol_vec(price, 100.0, 100.0, 1.0, True)
+    assert abs(float(out) - 0.2) < 1e-6
+
+
+def test_mixed_valid_and_invalid():
+    """One bad row must not contaminate the valid rows."""
+    k = np.array([100.0, 100.0, 130.0])
+    T = np.array([1.0, 0.0, 0.25])
+    s = np.array([0.2, 0.3, 0.8])
+    price = bs_price(100.0, k, np.where(T > 0, T, 1.0), s, True)
+    out = implied_vol_vec(price, 100.0, k, T, True)
+    assert np.isnan(out[1])
+    assert abs(out[0] - 0.2) < 1e-6
+    assert abs(out[2] - 0.8) < 1e-6
+
+
+def test_calls_and_puts_mixed():
+    """Per-row call/put selection through the is_call array."""
+    k = np.array([90.0, 110.0, 100.0, 120.0])
+    s = np.array([0.3, 0.4, 0.5, 0.6])
+    is_call = np.array([True, False, True, False])
+    price = bs_price(100.0, k, 0.5, s, is_call)
+    out = implied_vol_vec(price, 100.0, k, 0.5, is_call)
+    assert np.nanmax(np.abs(out - s)) < 1e-6
