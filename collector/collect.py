@@ -38,7 +38,7 @@ def fetch_book_summary(session: requests.Session, currency: str) -> list[dict]:
     r.raise_for_status()
     playload=r.json()
     if "result" not in playload:
-        raise requests.RequestException(f"Réponse inattendue : {playload}")
+        raise requests.RequestException(f"Wrong answer : {playload}")
     return playload["result"]
 
 def parse_instrument(name: str) -> tuple[datetime, float, str]:
@@ -105,7 +105,7 @@ def run_once(session: requests.Session) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--once", action="store_true", help="un seul snapshot puis arrêt")
+    parser.add_argument("--once", action="store_true", help="one snapshot then break")
     args = parser.parse_args()
  
     logging.basicConfig(
