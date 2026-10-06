@@ -67,7 +67,7 @@ def to_dataframe(rows: list[dict], currency: str, snapshot_ts: pd.Timestamp) -> 
             "expiry": expiry,
             "strike": strike,
             "option_type": option_type,
-            "bid_ask": row.get("bid_ask"),
+            "bid_price": row.get("bid_price"),
             "ask_price": row.get("ask_price"),
             "mark_price": row.get("mark_price"),  
             "mark_iv": row.get("mark_iv"),       
