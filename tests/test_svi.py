@@ -3,7 +3,8 @@ import pandas as pd
 import pytest
 
 from pricing.svi import (
-    svi, fit_svi, fit_surface, butterfly_density, check_calendar, surface_iv,
+    svi, fit_svi, fit_surface, observed_k_ranges, butterfly_density,
+    butterfly_min_on_range, check_calendar, surface_iv,
 )
 
 P = (0.04, 0.1, -0.3, 0.0, 0.1)   # a, b, rho, m, s
@@ -73,6 +74,26 @@ def test_fit_surface_returns_sorted_T():
     assert Ts == sorted(Ts)
 
 
+def test_observed_k_ranges_without_margin():
+    clean = pd.DataFrame({"T": [0.1, 0.1, 0.1], "log_m": [-0.2, 0.0, 0.2]})
+    kr = observed_k_ranges(clean, [(0.1, P)], margin=0.0)
+    assert kr[0.1] == pytest.approx((-0.2, 0.2))
+
+
+def test_observed_k_ranges_with_margin():
+    clean = pd.DataFrame({"T": [0.1, 0.1, 0.1], "log_m": [-0.2, 0.0, 0.2]})
+    kr = observed_k_ranges(clean, [(0.1, P)], margin=0.1)
+    assert kr[0.1] == pytest.approx((-0.24, 0.24))   # 10 % of the width 0.4
+
+
+def test_observed_k_ranges_one_range_per_slice():
+    clean = pd.DataFrame({"T": [0.1, 0.1, 0.2, 0.2],
+                          "log_m": [-0.1, 0.1, -0.5, 0.5]})
+    kr = observed_k_ranges(clean, [(0.1, P), (0.2, P2)], margin=0.0)
+    assert kr[0.1] == pytest.approx((-0.1, 0.1))
+    assert kr[0.2] == pytest.approx((-0.5, 0.5))
+
+
 def test_butterfly_density_positive_on_example():
     g = butterfly_density(np.linspace(-1.5, 1.5, 601), *P)
     assert g.min() >= 0
@@ -93,13 +114,41 @@ def test_butterfly_density_negative_on_steep_wings():
     assert g.min() < 0
 
 
+def test_butterfly_min_on_range_example_is_positive():
+    assert butterfly_min_on_range(P, (-0.3, 0.3)) >= 0
+
+
+def test_butterfly_min_on_range_matches_grid_minimum():
+    steep = (0.01, 2.0, 0.9, 0.0, 0.05)
+    grid = np.linspace(-1.5, 1.5, 200)
+    expected = butterfly_density(grid, *steep).min()
+    assert butterfly_min_on_range(steep, (-1.5, 1.5), n=200) == pytest.approx(expected)
+
+
 def test_check_calendar_ok_and_violation():
-    assert check_calendar([(0.1, P), (0.2, P2)])[0][2] > 0
-    assert check_calendar([(0.1, P2), (0.2, P)])[0][2] < 0
+    kr = {0.1: (-0.3, 0.3), 0.2: (-0.3, 0.3)}
+    assert check_calendar([(0.1, P), (0.2, P2)], kr)[0][2] > 0
+    assert check_calendar([(0.1, P2), (0.2, P)], kr)[0][2] < 0
 
 
 def test_check_calendar_sorts_input():
-    assert check_calendar([(0.2, P2), (0.1, P)])[0][2] > 0
+    kr = {0.1: (-0.3, 0.3), 0.2: (-0.3, 0.3)}
+    assert check_calendar([(0.2, P2), (0.1, P)], kr)[0][2] > 0
+
+
+def test_check_calendar_no_overlap_gives_nan():
+    kr = {0.1: (-0.5, -0.3), 0.2: (0.3, 0.5)}
+    out = check_calendar([(0.1, P), (0.2, P2)], kr)
+    assert np.isnan(out[0][2])
+
+
+def test_check_calendar_returns_one_row_per_pair():
+    p3 = (0.12, 0.1, -0.3, 0.0, 0.1)
+    kr = {0.1: (-0.3, 0.3), 0.2: (-0.3, 0.3), 0.3: (-0.3, 0.3)}
+    out = check_calendar([(0.1, P), (0.2, P2), (0.3, p3)], kr)
+    assert len(out) == 2
+    assert (out[0][0], out[0][1]) == (0.1, 0.2)
+    assert (out[1][0], out[1][1]) == (0.2, 0.3)
 
 
 def test_surface_iv_exact_slice():

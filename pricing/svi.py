@@ -14,8 +14,8 @@ def fit_svi(k:float,w:float)-> tuple[float, float, float, float, float]:
     def reside(x):
         return svi(k, *x)-w
 
-    lo = [-1.0,   1e-6, -0.999, k.min() - 1.0, 1e-4]
-    hi = [w.max(), 10.0,  0.999, k.max() + 1.0, 5.0]
+    lo = [-0.1,   1e-6, -0.999, k.min() - 1.0, 1e-4]
+    hi = [w.max(), 10.0,  0.999, k.max() + 1.0, 1.0]
 
     best = None
     m0 = k[np.argmin(w)]
@@ -42,6 +42,14 @@ def fit_surface(clean:pd.DataFrame, min_point:int=7) -> list[tuple[float, tuple[
         list_params.append((T,params))
     return list_params
 
+def observed_k_ranges(clean:pd.DataFrame, slices:list[tuple[float, tuple[float, float, float, float, float]]], margin:float=0.1):
+    ends = {}
+    for T, _ in slices:
+        k = clean.loc[np.isclose(clean["T"], T), "log_m"]
+        width = k.max() - k.min()
+        ends[T]= (k.min() - margin * width, k.max() + margin * width)
+    return ends
+
 def butterfly_density(k:float, a:float, b:float, rho:float, m:float, s:float) -> float:
     k = np.asarray(k, dtype=float)
     R = np.sqrt((k - m) ** 2 + s ** 2)
@@ -50,15 +58,23 @@ def butterfly_density(k:float, a:float, b:float, rho:float, m:float, s:float) ->
     w2 = b * s ** 2 / R ** 3
     return (1 - k * w1 / (2 * w)) ** 2 - (w1 ** 2 / 4) * (1 / w + 0.25) + w2 / 2
 
-def check_calendar(slices, k_grid=None):
+def butterfly_min_on_range(params, k_range, n:int=200):
+    grid = np.linspace(k_range[0], k_range[1], n)
+    return float(butterfly_density(grid, *params).min())
+
+def check_calendar(slices:list[tuple[float, tuple[float, float, float, float, float]]], k_ranges, n:int=100):
     slices = sorted(slices, key=lambda x: x[0])
-    if k_grid is None:
-        k_grid = np.linspace(-1.5, 1.5, 301)
-    out = []
+    c = []
     for (T1, p1), (T2, p2) in zip(slices[:-1], slices[1:]):
-        gap = svi(k_grid, *p2) - svi(k_grid, *p1)
-        out.append((T1, T2, float(gap.min())))
-    return out
+        lo = max(k_ranges[T1][0], k_ranges[T2][0])
+        hi = min(k_ranges[T1][1], k_ranges[T2][1])
+        if lo >= hi:
+            c.append((T1, T2, float("nan")))
+            continue
+        grid = np.linspace(lo, hi, n)
+        gap = svi(grid, *p2) - svi(grid, *p1)
+        c.append((T1, T2, float(gap.min())))
+    return c
 
 def surface_iv(k:float, T:float, slices)->float:
     k = np.asarray(k, dtype=float)
