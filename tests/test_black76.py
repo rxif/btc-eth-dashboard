@@ -1,5 +1,7 @@
 import numpy as np
-from pricing.black76 import bs_price, vega, implied_vol_vec
+from scipy.stats import norm
+from pricing.black76 import bs_price, vega, implied_vol_vec, delta, gamma
+import pytest
 
 
 def test_reference_price():
@@ -82,3 +84,49 @@ def test_calls_and_puts_mixed():
     price = bs_price(100.0, k, 0.5, s, is_call)
     out = implied_vol_vec(price, 100.0, k, 0.5, is_call)
     assert np.nanmax(np.abs(out - s)) < 1e-6
+
+
+# ---------- Greeks: delta() and gamma() take the STRIKE K, not ln(K/F) ----------
+# To scan a grid of log-moneyness k = ln(K/F), build the strikes with K = F * exp(k).
+
+def test_call_put_delta_differ_by_one():
+    F, T, sigma = 100.0, 0.25, 0.5
+    k = np.linspace(-0.5, 0.5, 11)
+    K = F * np.exp(k)
+    dc = delta(F, K, T, sigma, True)
+    dp = delta(F, K, T, sigma, False)
+    assert dc - dp == pytest.approx(np.ones_like(k))
+
+
+def test_delta_bounds_and_monotonic_in_k():
+    F, T, sigma = 100.0, 0.25, 0.5
+    k = np.linspace(-1.0, 1.0, 50)
+    K = F * np.exp(k)
+    dc = delta(F, K, T, sigma, True)
+    dp = delta(F, K, T, sigma, False)
+    assert np.all((dc >= 0) & (dc <= 1))
+    assert np.all((dp >= -1) & (dp <= 0))
+    assert np.all(np.diff(dc) < 0)   # both decrease with k = ln(K/F)
+    assert np.all(np.diff(dp) < 0)
+
+
+def test_atm_forward_call_delta():
+    # at K = F, d1 = 0.5 * sigma * sqrt(T)
+    sigma, T = 0.4, 0.5
+    expected = norm.cdf(0.5 * sigma * np.sqrt(T))
+    assert delta(100.0, 100.0, T, sigma, True) == pytest.approx(expected)
+
+
+def test_gamma_positive():
+    F = 100.0
+    k = np.linspace(-0.5, 0.5, 11)
+    assert np.all(gamma(F, F * np.exp(k), 0.25, 0.5) > 0)
+
+
+def test_gamma_matches_finite_difference_of_delta():
+    # K is fixed and F moves: delta takes K directly, no conversion needed
+    K, F, T, sigma, h = 100.0, 105.0, 0.25, 0.5, 1e-3
+    d_up = delta(F + h, K, T, sigma, True)
+    d_dn = delta(F - h, K, T, sigma, True)
+    fd = (d_up - d_dn) / (2 * h)
+    assert gamma(F, K, T, sigma) == pytest.approx(fd, rel=1e-5)

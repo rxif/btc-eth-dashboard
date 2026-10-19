@@ -1,8 +1,5 @@
-from math import nan
 import numpy as np
-from numpy._core.umath import NAN
 from scipy.stats import norm
-from scipy.optimize import brentq
 
 def bs_price(F:float, k:float, T:float, sigma:float, is_call: bool) -> float:
     sigma_sqrt_T = sigma * np.sqrt(T)
@@ -11,6 +8,16 @@ def bs_price(F:float, k:float, T:float, sigma:float, is_call: bool) -> float:
     call = F*norm.cdf(d1) - k*norm.cdf(d2)
     put = k*norm.cdf(-d2) - F*norm.cdf(-d1)
     return np.where(is_call, call, put)
+
+def delta(F:float, k:float, T:float, sigma:float, is_call:bool)->float:
+    sigma_sqrt_T = sigma * np.sqrt(T)
+    d1 = (np.log(F/k) + 0.5*sigma_sqrt_T**2)/sigma_sqrt_T
+    return np.where(is_call, norm.cdf(d1), -norm.cdf(-d1))
+
+def gamma(F:float, k:float, T:float, sigma:float)->float:
+    sigma_sqrt_T = sigma * np.sqrt(T)
+    d1 = (np.log(F/k) + 0.5*sigma_sqrt_T**2)/sigma_sqrt_T
+    return norm.pdf(d1)/(sigma_sqrt_T*F)
 
 def vega(F:float, k:float, T:float, sigma:float) -> float : 
     sqrt_T = np.sqrt(T)
