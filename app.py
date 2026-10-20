@@ -16,6 +16,7 @@ from dashboard.data import list_snapshots, build, k_range_at, compute_vrp, load_
 NO_DATA = "No usable data for this snapshot"
 
 app = Dash(__name__, external_stylesheets=[dbc.themes.DARKLY], title="BTC & ETH Dashboard")
+server = app.server
 
 
 def kpi(label, id_):
