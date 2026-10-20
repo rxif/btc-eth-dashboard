@@ -1,0 +1,136 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+
+/* ============================================================
+   "Financial terminal" theme: black background, amber orange,
+   monospace font, square corners, green/red for changes
+   ============================================================ */
+
+:root {
+  --bg-0: #000000;
+  --bg-1: #0a0a0a;
+  --card: #0f0f0f;
+  --card-border: #2a2a2a;
+  --header: #1a1a1a;
+  --text: #e6e6e6;
+  --muted: #8a8a8a;
+  --orange: #ff9900;   /* signature color */
+  --amber: #ffb84d;
+  --yellow: #ffd400;   /* highlight */
+  --blue: #3d8bff;     /* links / secondary tabs */
+  --up: #00d26a;       /* up move */
+  --down: #ff3b3b;     /* down move */
+}
+
+html, body {
+  background: var(--bg-0);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', 'Consolas', 'Courier New', monospace;
+  font-size: 13px;
+  min-height: 100vh;
+}
+
+/* Title: solid orange, uppercase, no gradient */
+.brand {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--orange);
+}
+
+.subtitle {
+  color: var(--muted);
+  font-weight: 400;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+}
+
+/* Panels: flat, square corners, orange top border */
+.glass {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-top: 2px solid var(--orange);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* KPI */
+.kpi { padding: 10px 12px; }
+.kpi-label {
+  color: var(--orange);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.kpi-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 2px 0 0 0;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Change colors to apply to values */
+.up   { color: var(--up) !important; }
+.down { color: var(--down) !important; }
+.flat { color: var(--yellow) !important; }
+
+/* Forms */
+.form-label {
+  color: var(--orange);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.form-select {
+  background-color: #000;
+  border: 1px solid var(--card-border);
+  color: var(--amber);
+  border-radius: 0;
+  font-family: inherit;
+}
+.form-select:focus {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 1px var(--orange);
+}
+.form-select option { background: #000; color: var(--amber); }
+
+/* Tabs: terminal "function keys" style, active tab as a solid orange block */
+.nav-tabs { border-bottom: 1px solid var(--orange); }
+.nav-tabs .nav-link {
+  color: var(--muted);
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 6px 16px;
+}
+.nav-tabs .nav-link:hover { color: var(--orange); background: var(--header); }
+.nav-tabs .nav-link.active {
+  color: #000;
+  background: var(--orange);
+  border-bottom: none;
+}
+
+.footer-note {
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Plotly */
+.js-plotly-plot .plotly .modebar { background: transparent !important; }
+.js-plotly-plot .plotly .modebar-btn path { fill: var(--muted) !important; }
+.js-plotly-plot .plotly .modebar-btn:hover path { fill: var(--orange) !important; }
+
+/* DataTable: dark hover instead of the default light one */
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner tr:hover td,
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner td:hover {
+  background-color: #1a1a1a !important;
+}
