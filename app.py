@@ -36,7 +36,7 @@ def snapshot_parts(f):
     return year, month, day, f"{f.stem[9:11]}:{f.stem[11:13]}"
 
 
-def snapshots(ccy, year=None, month=None, day=None)
+def snapshots(ccy, year=None, month=None, day=None):
     out = []
     for f in list_snapshots(ccy):
         try:
