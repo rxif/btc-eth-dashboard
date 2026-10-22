@@ -1,5 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
+import threading
+import time
 
 import numpy as np
 import pandas as pd
@@ -18,32 +20,38 @@ def list_snapshots(currency="BTC"):
     return sorted(folder.glob("date=*/snapshot_*.parquet"))
 
 
-@lru_cache(maxsize=8)
-def build(path_str):
+_build_lock = threading.Lock()
 
+
+@lru_cache(maxsize=128)
+def _build(path_str):
     df = add_quality_column(add_implied_vol(load_snapshot(path_str)))
     clean = clean_chain(df)
     slices = fit_surface(clean)
     kr = observed_k_ranges(clean, slices) if slices else {}
     return clean, slices, kr
 
-@lru_cache(maxsize=8)
+
+def build(path_str):
+    with _build_lock:
+        return _build(path_str)
+
+@lru_cache(maxsize=128)
 def load_raw(path_str):
     return pd.read_parquet(path_str)
 
 @lru_cache(maxsize=256)
 def download(currency, end):
+    return fetch_ohlc(currency, end - pd.Timedelta(days=120), end)
+
+def compute_vrp(slices, currency, end):
     end = pd.Timestamp(end)
     end = end.tz_localize("UTC") if end.tzinfo is None else end.tz_convert("UTC")
     end = end.normalize()
-    df = fetch_ohlc(currency, end - pd.Timedelta(days=120), end)
-    return df
-
-def compute_vrp(slices, currency, end):
     df = download(currency, end)
     vrp = vrp_summary(slices, df)
     roll_close = rolling_close_to_close(df[:-1]["close"]).dropna()
-    roll_park = rolling_parkinson(df[:-1]["low"],df[:-1]["high"]).dropna()
+    roll_park = rolling_parkinson(df[:-1]["high"], df[:-1]["low"]).dropna()
     return vrp, roll_close, roll_park
 
 def k_range_at(T, slices, kr):
@@ -54,3 +62,29 @@ def k_range_at(T, slices, kr):
         return kr[T]
     a, b = Tn[max(j - 1, 0)], Tn[min(j, len(Tn) - 1)]
     return max(kr[a][0], kr[b][0]), min(kr[a][1], kr[b][1])
+
+def warm_up(currency="BTC", n=8, step=1, every=60):
+    while True:
+        try:
+            snaps = list_snapshots(currency)
+            for p in snaps[::-step][:n]:            
+                try:
+                    build(str(p))
+                    load_raw(str(p))
+                except Exception:
+                    continue                          
+                time.sleep(1)                         
+        except Exception:
+            pass
+        time.sleep(every)
+
+def compute_vrp(slices, currency, end):
+    end = pd.Timestamp(end)
+    end = end.tz_localize("UTC") if end.tzinfo is None else end.tz_convert("UTC")
+    end = end.normalize()
+    df = download(currency, end)
+    summary = vrp_summary(slices, df)
+    done = df.iloc[:-1]
+    roll_close = rolling_close_to_close(done["close"]).dropna()
+    roll_park = rolling_parkinson(done["high"], done["low"]).dropna()
+    return summary, roll_close, roll_park

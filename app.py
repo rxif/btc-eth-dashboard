@@ -12,12 +12,17 @@ from dashboard.terminal_theme import C, empty_figure, TABLE_STYLE
 from pricing.svi import surface_iv, svi, butterfly_min_on_range
 from pricing.metrics import smile_table, GEX
 from dashboard.data import list_snapshots, build, k_range_at, compute_vrp, load_raw
+import os
+import threading
+from dashboard.data import warm_up
 
 NO_DATA = "No usable data for this snapshot"
 
 app = Dash(__name__, external_stylesheets=[dbc.themes.DARKLY], title="BTC & ETH Dashboard")
 server = app.server
 
+if os.environ.get("WARM_UP") == "1":
+    threading.Thread(target=warm_up, args=("BTC", 8, 1), daemon=True).start()
 
 def kpi(label, id_):
     return html.Div([
@@ -27,13 +32,11 @@ def kpi(label, id_):
 
 
 def snapshot_parts(f):
-    """Split a snapshot path into (year, month, day, "HH:MM")."""
     year, month, day = f.parent.name[5:].split("-")
     return year, month, day, f"{f.stem[9:11]}:{f.stem[11:13]}"
 
 
-def snapshots(ccy, year=None, month=None, day=None):
-    """Snapshots of a currency, optionally filtered by year / month / day."""
+def snapshots(ccy, year=None, month=None, day=None)
     out = []
     for f in list_snapshots(ccy):
         try:
@@ -47,7 +50,6 @@ def snapshots(ccy, year=None, month=None, day=None):
 
 
 def keep_or_latest(values, current):
-    """Keep the current choice if it still exists, otherwise take the latest one."""
     if not values:
         return None
     return current if current in values else values[-1]
@@ -407,4 +409,4 @@ def draw_vrp(path, ccy):
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=os.environ.get("DASH_DEBUG") == "1")
