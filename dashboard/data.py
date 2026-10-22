@@ -20,11 +20,11 @@ def list_snapshots(currency="BTC"):
     return sorted(folder.glob("date=*/snapshot_*.parquet"))
 
 
+_build_cache = {}
 _build_lock = threading.Lock()
 
 
-@lru_cache(maxsize=128)
-def _build(path_str):
+def _compute_build(path_str):
     df = add_quality_column(add_implied_vol(load_snapshot(path_str)))
     clean = clean_chain(df)
     slices = fit_surface(clean)
@@ -33,8 +33,17 @@ def _build(path_str):
 
 
 def build(path_str):
+    hit = _build_cache.get(path_str)
+    if hit is not None:
+        return hit
     with _build_lock:
-        return _build(path_str)
+        hit = _build_cache.get(path_str)
+        if hit is None:
+            hit = _compute_build(path_str)
+            _build_cache[path_str] = hit
+            if len(_build_cache) > 128:
+                _build_cache.pop(next(iter(_build_cache)))
+        return hit
 
 @lru_cache(maxsize=128)
 def load_raw(path_str):
